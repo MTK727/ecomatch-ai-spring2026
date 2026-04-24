@@ -187,10 +187,6 @@
     let providerMap = null;
     let mapMarker = null;
 
-    if(getDB('reports').length === 0) {
-        setDB('reports', [{ id: 'EM-' + Math.floor(Math.random()*9000+1000), userId: 'dummy', category: 'Plastic', weight: 2.8, location: 'Dhanmondi 32', status: 'Pending', reward: 28 }]);
-    }
-
     let cocoModel = null;
     cocoSsd.load().then(model => {
         cocoModel = model;
