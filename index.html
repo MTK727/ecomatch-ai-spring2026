@@ -1,1 +1,585 @@
-<h1>EcoMatch AI </h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoMatch AI</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { margin: 0; background-color: #f4f7f5; color: #333; display: flex; height: 100vh; overflow: hidden; }
+        .hidden { display: none !important; }
+        #login-view { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; background: #eef2ef; position: absolute; z-index: 100; }
+        .login-card { background: white; padding: 50px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); width: 450px; text-align: center; }
+        .login-card h2 { color: #1B3022; font-size: 28px; margin-bottom: 30px; }
+        .login-card label { display: block; text-align: left; margin-top: 20px; font-size: 13px; font-weight: 600; color: #666; }
+        .login-card input { width: 100%; padding: 14px; margin-top: 8px; border: 1px solid #e0e0e0; border-radius: 10px; background-color: #fcfcfc; }
+        .auth-link { color: #2B4A3B; cursor: pointer; font-weight: 600; display: block; margin-top: 15px; font-size: 14px; }
+        .sidebar { width: 280px; background-color: #2B4A3B; padding: 40px 20px; display: flex; flex-direction: column; color: white; }
+        .logo-area { text-align: center; margin-bottom: 50px; }
+        .logo-area img { width: 60px; margin-bottom: 10px; }
+        .logo-area h2 { margin: 0; font-size: 22px; letter-spacing: 1px; }
+        .nav-item { padding: 15px 20px; margin-bottom: 8px; color: #c2d1c9; cursor: pointer; border-radius: 12px; font-weight: 500; transition: 0.3s; }
+        .nav-item:hover, .nav-item.active { background-color: #3a5e4b; color: white; }
+        .logout-btn { margin-top: auto; color: #ff9e9e; cursor: pointer; padding: 15px; font-weight: 600; font-size: 14px; }
+        .main-content { flex: 1; padding: 50px; overflow-y: auto; }
+        h1 { font-size: 32px; color: #1B3022; margin-bottom: 30px; }
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 40px; }
+        .stat-card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border-left: 6px solid #2B4A3B; }
+        .stat-card h3 { margin: 0; color: #8c9691; font-size: 13px; text-transform: uppercase; }
+        .stat-card .val { font-size: 36px; font-weight: 800; color: #2B4A3B; margin-top: 10px; }
+        .wallet-display { background: #2B4A3B; color: white; padding: 20px 30px; border-radius: 15px; text-align: right; }
+        .wallet-display h3 { margin: 0; font-size: 12px; color: #c2d1c9; }
+        .wallet-display .val { font-size: 28px; font-weight: 800; margin-top: 5px; }
+        .settings-card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); max-width: 600px; }
+        .form-group { margin-bottom: 25px; }
+        .form-group label { display: block; font-size: 14px; font-weight: 600; color: #666; margin-bottom: 8px; }
+        .form-group input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; background: #fafafa; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+        th { background: #f8faf9; padding: 18px; text-align: left; font-size: 13px; color: #8c9691; }
+        td { padding: 18px; font-size: 14px; border-bottom: 1px solid #edf2f0; }
+        .badge { padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+        .badge-success { background: #e6ffed; color: #1a7f37; }
+        .btn-green { background: #2B4A3B; color: white; border: none; padding: 15px 25px; border-radius: 10px; font-weight: 700; cursor: pointer; }
+        .btn-outline { background: white; color: #2B4A3B; border: 2px solid #2B4A3B; padding: 12px 20px; border-radius: 10px; font-weight: 700; cursor: pointer; }
+        .btn-disabled { background-color: #ccc !important; cursor: not-allowed !important; }
+        .progress-container { width: 100%; background: #eee; border-radius: 10px; height: 18px; margin: 25px 0; overflow: hidden; }
+        .progress-bar { width: 0%; height: 100%; background: #2B4A3B; transition: width 0.4s ease; }
+        .modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: white; padding: 40px; border-radius: 20px; width: 400px; text-align: center; }
+        .job-card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border-left: 6px solid #d73a49; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        #job-map { height: 300px; width: 100%; border-radius: 15px; margin-bottom: 20px; border: 2px solid #ccd6d0; z-index: 1; }
+    </style>
+</head>
+<body>
+
+    <div id="login-view">
+        <div class="login-card">
+            <h2 id="auth-title">EcoMatch AI</h2>
+            <div id="auth-inputs">
+                <div id="field-name" class="hidden">
+                    <label>Full Name</label>
+                    <input type="text" id="reg-name" placeholder="John Doe">
+                </div>
+                <label>Email Address</label>
+                <input type="text" id="user-email" placeholder="Enter your email">
+                <label>Password</label>
+                <div style="position: relative;">
+                    <input type="password" id="user-pass" placeholder="••••••••" style="width: 100%; padding-right: 50px;">
+                    <span id="toggle-pass" onclick="togglePassword()" style="position: absolute; right: 15px; top: 20px; cursor: pointer; color: #8c9691; font-size: 13px; font-weight: 700; user-select: none;">Show</span>
+                </div>
+            </div>
+            <div style="display: flex; gap: 15px; margin-top: 35px;">
+                <button id="btn-main" class="btn-green" style="flex:1" onclick="appLogin('citizen')">Login as Citizen</button>
+                <button id="btn-sec" class="btn-outline" style="flex:1" onclick="appLogin('provider')">Login as Provider</button>
+            </div>
+            <div class="auth-links">
+                <span id="link-forgot" class="auth-link" onclick="toggleAuth('forgot')">Forgot Password?</span>
+                <span id="link-signup" class="auth-link" onclick="toggleAuth('signup')">Don't have an account? Sign Up</span>
+                <span id="link-back" class="auth-link hidden" onclick="toggleAuth('login')">Back to Login</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="ai-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2 style="color: #2B4A3B;" id="ai-modal-title">AI Analysis</h2>
+            <p id="ai-modal-desc">Scanning image...</p>
+            <div id="location-input-area" class="form-group hidden" style="text-align: left; margin: 15px 0;">
+                <label>Waste Location</label>
+                <input type="text" id="report-location" placeholder="e.g. Dhanmondi 32, Road 4">
+            </div>
+            <button id="btn-post-report" class="btn-green hidden" style="width: 100%;" onclick="submitReport()">Post Report</button>
+            <button class="btn-outline" style="width: 100%; margin-top:10px;" onclick="closeModal()">Cancel</button>
+        </div>
+    </div>
+
+    <div id="app-view" class="hidden" style="width: 100%; display: flex;">
+        <div class="sidebar">
+            <div class="logo-area"><h2 style="color:#fff; padding-top:20px;">EcoMatch AI</h2></div>
+            <div class="nav-item citizen-only" id="menu-dash" onclick="showSection('dashboard')">Impact Dashboard</div>
+            <div class="nav-item citizen-only" id="menu-scan" onclick="showSection('scanner')">AI Waste Scanner</div>
+            <div class="nav-item provider-only hidden" id="menu-market" onclick="showSection('marketplace')">Marketplace Map</div>
+            <div class="nav-item provider-only hidden" id="menu-verify" onclick="showSection('verification')">Job Verification</div>
+            <div class="nav-item provider-only hidden" id="menu-history" onclick="showSection('provider-history')">Earnings History</div>
+            <div class="nav-item" id="menu-settings" onclick="showSection('settings')">Profile Settings</div>
+            <div class="logout-btn" onclick="appLogout()">Logout</div>
+        </div>
+        <div class="main-content">
+            <div id="sec-dashboard" class="citizen-only">
+                <h1>Impact Dashboard</h1>
+                <div class="stat-grid">
+                    <div class="stat-card"><h3>Total Reports Made</h3><div class="val" id="total-reports">0</div></div>
+                    <div class="stat-card"><h3>Waste Diverted</h3><div class="val" id="total-weight">0 kg</div></div>
+                </div>
+                <h3>My Report History</h3>
+                <table>
+                    <thead><tr><th>ID</th><th>Category</th><th>Location</th><th>Weight</th><th>Status</th></tr></thead>
+                    <tbody id="report-table-body"></tbody>
+                </table>
+            </div>
+
+            <div id="sec-scanner" class="citizen-only hidden">
+                <h1>AI Waste Scanner</h1>
+                <div style="background: white; padding: 40px; border-radius: 20px; text-align: center; border: 2px dashed #ccd6d0;">
+                    <input type="file" id="cit-upload" accept="image/*" class="hidden" onchange="processCitizenImage(event)">
+                    <img id="citizen-preview" style="max-width: 100%; max-height: 250px; margin-bottom: 20px; border-radius: 10px; display:none;">
+                    <br>
+                    <button class="btn-green" onclick="document.getElementById('cit-upload').click()">Upload Photo to Scan</button>
+                    <p style="font-size:12px; color:#8c9691; margin-top:15px;">Model ready. Try photos of bottles, cups, apples, or bananas.</p>
+                </div>
+            </div>
+
+            <div id="sec-marketplace" class="provider-only hidden">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                    <h1>Marketplace</h1>
+                    <div class="wallet-display"><h3>Wallet Balance</h3><div class="val" id="wallet-balance">৳0.00</div></div>
+                </div>
+                <h3>Available Cleanup Jobs</h3>
+                <div id="job-list-area"></div>
+            </div>
+
+            <div id="sec-verification" class="provider-only hidden">
+                <h1>Job Verification</h1>
+                <p id="current-job-text" style="font-weight: 600; color: #2B4A3B; margin-bottom: 20px;">No active job claimed.</p>
+                
+                <div id="job-map" class="hidden"></div>
+
+                <div id="ai-ui" class="hidden" style="background: white; padding: 40px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+                    <input type="file" id="prov-upload" accept="image/*" class="hidden" onchange="processProviderImage(event)">
+                    <div style="text-align: center;">
+                        <img id="provider-preview" style="max-width: 100%; max-height: 250px; margin-bottom: 20px; border-radius: 10px; display:none;">
+                    </div>
+                    <div class="progress-container" id="verify-progress-box"><div class="progress-bar" id="verify-bar"></div></div>
+                    <p id="verify-status" style="font-weight:700; text-align:center; margin-bottom:20px;"></p>
+                    <button class="btn-outline" style="margin-bottom:15px; width:100%" onclick="document.getElementById('prov-upload').click()">Upload 'After' Photo</button>
+                    <button id="btn-finish" class="btn-green btn-disabled" style="width:100%" disabled onclick="finishJob()">Complete Job & Claim Reward</button>
+                </div>
+            </div>
+
+            <div id="sec-provider-history" class="provider-only hidden">
+                <h1>Earnings History</h1>
+                <table>
+                    <thead><tr><th>Job ID</th><th>Location</th><th>Weight</th><th>Earnings</th></tr></thead>
+                    <tbody id="earnings-table-body"></tbody>
+                </table>
+            </div>
+
+            <div id="sec-settings" class="hidden">
+                <h1>Profile Settings</h1>
+                <div class="settings-card">
+                    <div class="form-group"><label>Full Name</label><input type="text" id="prof-name"></div>
+                    <div class="form-group"><label>Email Address</label><input type="email" id="prof-email" readonly style="background:#eef2ef;"></div>
+                    <button class="btn-green" onclick="updateProfile()">Update Profile</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const getDB = (table) => JSON.parse(localStorage.getItem(`ecomatch_${table}`)) || [];
+    const setDB = (table, data) => localStorage.setItem(`ecomatch_${table}`, JSON.stringify(data));
+    let currentUser = JSON.parse(localStorage.getItem('ecomatch_session'));
+    let tempReportData = null;
+    let providerMap = null;
+    let mapMarker = null;
+
+    if(getDB('reports').length === 0) {
+        setDB('reports', [{ id: 'EM-' + Math.floor(Math.random()*9000+1000), userId: 'dummy', category: 'Plastic', weight: 2.8, location: 'Dhanmondi 32', status: 'Pending', reward: 28 }]);
+    }
+
+    let cocoModel = null;
+    cocoSsd.load().then(model => {
+        cocoModel = model;
+        console.log("TensorFlow Object Detection AI Loaded");
+    });
+
+    const plasticItems = ['bottle', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'cell phone', 'mouse', 'laptop', 'backpack', 'umbrella', 'vase'];
+    const organicItems = ['apple', 'banana', 'orange', 'broccoli', 'carrot', 'pizza', 'donut', 'cake', 'hot dog', 'sandwich'];
+    const allTrash = [...plasticItems, ...organicItems];
+
+    window.togglePassword = () => {
+        const passInput = document.getElementById('user-pass');
+        const toggleBtn = document.getElementById('toggle-pass');
+        if (passInput.type === "password") {
+            passInput.type = "text";
+            toggleBtn.innerText = "Hide";
+        } else {
+            passInput.type = "password";
+            toggleBtn.innerText = "Show";
+        }
+    };
+
+    window.processCitizenImage = async (event) => {
+        if(!cocoModel) return alert("AI is still loading in the background. Please wait a few seconds.");
+        const file = event.target.files[0];
+        if(!file) return;
+
+        const img = document.getElementById('citizen-preview');
+        img.src = URL.createObjectURL(file);
+        img.style.display = 'inline-block';
+        
+        document.getElementById('ai-modal').classList.remove('hidden');
+        document.querySelector('#ai-modal-desc').innerHTML = "AI is scanning objects...";
+        document.getElementById('btn-post-report').classList.add('hidden');
+        document.getElementById('location-input-area').classList.add('hidden');
+
+        img.onload = async () => {
+            const predictions = await cocoModel.detect(img);
+            let foundPlastic = false;
+            let foundOrganic = false;
+            let itemCount = 0;
+
+            predictions.forEach(p => {
+                if(plasticItems.includes(p.class)) { foundPlastic = true; itemCount++; }
+                if(organicItems.includes(p.class)) { foundOrganic = true; itemCount++; }
+            });
+
+            if(itemCount === 0) {
+                document.querySelector('#ai-modal-desc').innerHTML = "AI could not detect any recognizable waste in this photo. Please try a clearer picture.";
+            } else {
+                let cat = foundPlastic ? "Plastic" : "Organic";
+                let w = (itemCount * 1.2 + 0.4).toFixed(1);
+                tempReportData = { category: cat, weight: parseFloat(w) };
+                document.querySelector('#ai-modal-desc').innerHTML = `Detected <strong>${itemCount}</strong> object(s).<br>Classified as: <strong>${w}kg of ${cat} Waste</strong>.`;
+                document.getElementById('location-input-area').classList.remove('hidden');
+                document.getElementById('btn-post-report').classList.remove('hidden');
+            }
+        };
+    };
+
+    window.processProviderImage = async (event) => {
+        if(!cocoModel) return alert("AI is still loading. Please wait a few seconds.");
+        const file = event.target.files[0];
+        if(!file) return;
+
+        const img = document.getElementById('provider-preview');
+        img.src = URL.createObjectURL(file);
+        img.style.display = 'inline-block';
+        
+        const status = document.getElementById('verify-status');
+        const finishBtn = document.getElementById('btn-finish');
+        const bar = document.getElementById('verify-bar');
+
+        img.onload = async () => {
+            status.innerText = "Scanning for remaining waste...";
+            status.style.color = "#b45d00";
+            bar.style.width = "50%";
+            finishBtn.disabled = true;
+
+            const predictions = await cocoModel.detect(img);
+            let trashCount = predictions.filter(p => allTrash.includes(p.class)).length;
+
+            bar.style.width = "100%";
+            if(trashCount === 0) {
+                status.innerText = "100% Verified! No waste detected in this area.";
+                status.style.color = "#1a7f37";
+                finishBtn.disabled = false;
+                finishBtn.classList.remove('btn-disabled');
+            } else {
+                status.innerText = `Analysis Failed: AI detected ${trashCount} piece(s) of waste remaining.`;
+                status.style.color = "#d73a49";
+            }
+        };
+    };
+
+    window.onload = () => {
+        if (currentUser) setupUI(currentUser.role);
+    };
+
+    window.appLogin = (role) => {
+        const email = document.getElementById('user-email').value;
+        const pass = document.getElementById('user-pass').value;
+        const name = document.getElementById('reg-name').value;
+        const isSignUp = !document.getElementById('field-name').classList.contains('hidden');
+
+        if (!email || !pass) return alert("Please fill all fields");
+
+        let users = getDB('users');
+
+        if (isSignUp) {
+            if (users.find(u => u.email === email)) return alert("Email already exists.");
+            const newUser = { uid: 'U' + Date.now(), name: name || "User", email, pass, role, wallet: 0 };
+            users.push(newUser);
+            setDB('users', users);
+            currentUser = newUser;
+        } else {
+            const user = users.find(u => u.email === email && u.pass === pass);
+            if (!user) return alert("Invalid credentials or user does not exist.");
+            currentUser = user;
+        }
+
+        localStorage.setItem('ecomatch_session', JSON.stringify(currentUser));
+        setupUI(currentUser.role);
+    };
+
+    window.appLogout = () => {
+        localStorage.removeItem('ecomatch_session');
+        location.reload();
+    };
+
+    function setupUI(role) {
+        document.getElementById('login-view').classList.add('hidden');
+        document.getElementById('app-view').classList.remove('hidden');
+        document.querySelectorAll('.citizen-only').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.provider-only').forEach(el => el.classList.add('hidden'));
+        
+        document.getElementById('prof-name').value = currentUser.name;
+        document.getElementById('prof-email').value = currentUser.email;
+
+        if (role === 'citizen') {
+            document.querySelectorAll('.citizen-only').forEach(el => el.classList.remove('hidden'));
+            showSection('dashboard');
+            loadCitizenDashboard();
+        } else {
+            document.querySelectorAll('.provider-only').forEach(el => el.classList.remove('hidden'));
+            showSection('marketplace');
+            loadProviderMarketplace();
+        }
+    }
+
+    window.showSection = (id) => {
+        const allSecs = ['dashboard', 'scanner', 'marketplace', 'verification', 'provider-history', 'settings'];
+        allSecs.forEach(s => {
+            const el = document.getElementById('sec-' + s);
+            if (el) el.classList.add('hidden');
+        });
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.getElementById('sec-' + id).classList.remove('hidden');
+        const navMap = { 'dashboard': 'menu-dash', 'scanner': 'menu-scan', 'marketplace': 'menu-market', 'verification': 'menu-verify', 'provider-history': 'menu-history', 'settings': 'menu-settings' };
+        if (document.getElementById(navMap[id])) document.getElementById(navMap[id]).classList.add('active');
+        
+        if(id === 'provider-history') loadProviderHistory();
+    };
+
+    window.toggleAuth = (mode) => {
+        const title = document.getElementById('auth-title');
+        const fieldName = document.getElementById('field-name');
+        const btnMain = document.getElementById('btn-main');
+        const btnSec = document.getElementById('btn-sec');
+        const linkForgot = document.getElementById('link-forgot');
+        const linkSignup = document.getElementById('link-signup');
+        const linkBack = document.getElementById('link-back');
+
+        if (mode === 'signup') {
+            title.innerText = "Create Account";
+            fieldName.classList.remove('hidden');
+            btnMain.innerText = "Register as Citizen";
+            btnSec.innerText = "Register as Provider";
+            linkForgot.classList.add('hidden');
+            linkSignup.classList.add('hidden');
+            linkBack.classList.remove('hidden');
+        } else {
+            title.innerText = "EcoMatch AI";
+            fieldName.classList.add('hidden');
+            btnMain.innerText = "Login as Citizen";
+            btnSec.innerText = "Login as Provider";
+            btnSec.classList.remove('hidden');
+            linkForgot.classList.remove('hidden');
+            linkSignup.classList.remove('hidden');
+            linkBack.classList.add('hidden');
+        }
+    };
+
+    window.updateProfile = () => {
+        const newName = document.getElementById('prof-name').value;
+        let users = getDB('users');
+        let userIndex = users.findIndex(u => u.uid === currentUser.uid);
+        if(userIndex > -1) {
+            users[userIndex].name = newName;
+            setDB('users', users);
+            currentUser.name = newName;
+            localStorage.setItem('ecomatch_session', JSON.stringify(currentUser));
+            alert("Profile Updated Successfully!");
+        }
+    };
+
+    window.closeModal = () => {
+        document.getElementById('ai-modal').classList.add('hidden');
+        document.getElementById('location-input-area').classList.add('hidden');
+        document.getElementById('report-location').value = "";
+    };
+    
+    window.submitReport = () => {
+        if(!tempReportData) return;
+        const loc = document.getElementById('report-location').value.trim();
+        if(!loc) return alert("Please enter the location of the waste.");
+
+        let reports = getDB('reports');
+        reports.push({
+            id: 'EM-' + Math.floor(Math.random()*9000+1000),
+            userId: currentUser.uid,
+            category: tempReportData.category,
+            weight: tempReportData.weight,
+            location: loc,
+            status: "Pending",
+            reward: tempReportData.weight * 10
+        });
+        setDB('reports', reports);
+        alert("Waste Reported Successfully!");
+        closeModal();
+        tempReportData = null;
+        showSection('dashboard');
+        loadCitizenDashboard();
+    };
+
+    window.loadCitizenDashboard = () => {
+        let reports = getDB('reports').filter(r => r.userId === currentUser.uid);
+        const tbody = document.getElementById("report-table-body");
+        tbody.innerHTML = "";
+        let totalW = 0;
+        
+        reports.forEach(r => {
+            totalW += r.weight;
+            let badgeColor = r.status === 'Completed' ? '#e6ffed' : '#fff4e5';
+            let textColor = r.status === 'Completed' ? '#1a7f37' : '#b45d00';
+            tbody.innerHTML += `<tr>
+                <td>${r.id}</td><td>${r.category}</td><td>${r.location}</td><td>${r.weight} kg</td>
+                <td><span class="badge" style="background:${badgeColor}; color:${textColor}">${r.status}</span></td>
+            </tr>`;
+        });
+
+        document.getElementById('total-reports').innerText = reports.length;
+        document.getElementById('total-weight').innerText = totalW.toFixed(1) + " kg";
+    };
+
+    window.loadProviderMarketplace = () => {
+        let reports = getDB('reports').filter(r => r.status === "Pending");
+        const listArea = document.getElementById('job-list-area');
+        listArea.innerHTML = "";
+
+        if(reports.length === 0) {
+            listArea.innerHTML = "<p>No pending jobs available right now.</p>";
+        } else {
+            reports.forEach(r => {
+                listArea.innerHTML += `
+                <div class="job-card">
+                    <div><strong>${r.location}</strong><br><small>${r.category} • ${r.weight} kg</small></div>
+                    <div style="text-align:right;">
+                        <span style="font-weight:800; color:#2B4A3B;">৳${r.reward.toFixed(2)}</span><br>
+                        <button class="btn-green" style="padding: 8px 15px; margin-top:10px; font-size:12px;" onclick="claimJob('${r.id}')">Claim Job</button>
+                    </div>
+                </div>`;
+            });
+        }
+        updateWalletDisplay();
+    };
+
+    window.claimJob = (jobId) => {
+        let reports = getDB('reports');
+        let index = reports.findIndex(r => r.id === jobId);
+        if(index > -1) {
+            reports[index].status = "Claimed";
+            reports[index].providerId = currentUser.uid;
+            setDB('reports', reports);
+            
+            alert("Job Claimed! Head to verification when cleanup is done.");
+            localStorage.setItem('ecomatch_active_job', JSON.stringify(reports[index]));
+            
+            showSection('verification');
+            loadActiveJob();
+        }
+    };
+
+    async function getCoordinates(address) {
+        const hardcoded = {
+            "Dhanmondi 32": [23.7508, 90.3774],
+            "Kalabagan": [23.7458, 90.3804],
+            "Gulshan 1": [23.7806, 90.4168],
+            "Banani": [23.7940, 90.4043]
+        };
+        if(hardcoded[address]) return hardcoded[address];
+
+        try {
+            let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Dhaka, Bangladesh')}`);
+            let data = await res.json();
+            if(data && data.length > 0) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+        } catch(e) {}
+        return [23.8103, 90.4125]; 
+    }
+
+    window.loadActiveJob = async () => {
+        const activeJob = JSON.parse(localStorage.getItem('ecomatch_active_job'));
+        if(activeJob) {
+            document.getElementById('current-job-text').innerText = `Active Job: ${activeJob.id} at ${activeJob.location}`;
+            document.getElementById('ai-ui').classList.remove('hidden');
+            document.getElementById('job-map').classList.remove('hidden');
+
+            let coords = await getCoordinates(activeJob.location);
+
+            if (!providerMap) {
+                providerMap = L.map('job-map').setView(coords, 15);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(providerMap);
+            } else {
+                providerMap.setView(coords, 15);
+            }
+
+            if (mapMarker) providerMap.removeLayer(mapMarker);
+            mapMarker = L.marker(coords).addTo(providerMap)
+                .bindPopup(`<b>${activeJob.category} Waste</b><br>${activeJob.weight} kg`).openPopup();
+
+            setTimeout(() => providerMap.invalidateSize(), 200);
+
+        } else {
+            document.getElementById('current-job-text').innerText = "No active job claimed.";
+            document.getElementById('ai-ui').classList.add('hidden');
+            document.getElementById('job-map').classList.add('hidden');
+        }
+    };
+
+    window.finishJob = () => {
+        const activeJob = JSON.parse(localStorage.getItem('ecomatch_active_job'));
+        let reports = getDB('reports');
+        let index = reports.findIndex(r => r.id === activeJob.id);
+        
+        if(index > -1) {
+            reports[index].status = "Completed";
+            setDB('reports', reports);
+            
+            let users = getDB('users');
+            let uIndex = users.findIndex(u => u.uid === currentUser.uid);
+            users[uIndex].wallet = (users[uIndex].wallet || 0) + activeJob.reward;
+            setDB('users', users);
+            currentUser.wallet = users[uIndex].wallet;
+            localStorage.setItem('ecomatch_session', JSON.stringify(currentUser));
+
+            localStorage.removeItem('ecomatch_active_job');
+            alert(`Job Completed! ৳${activeJob.reward.toFixed(2)} added to your wallet.`);
+            
+            document.getElementById('verify-bar').style.width = "0%";
+            document.getElementById('verify-status').innerText = "";
+            document.getElementById('btn-finish').disabled = true;
+            document.getElementById('btn-finish').classList.add('btn-disabled');
+            document.getElementById('provider-preview').style.display = 'none';
+            document.getElementById('job-map').classList.add('hidden');
+            
+            showSection('provider-history');
+        }
+    };
+
+    window.loadProviderHistory = () => {
+        let reports = getDB('reports').filter(r => r.providerId === currentUser.uid && r.status === "Completed");
+        const tbody = document.getElementById("earnings-table-body");
+        tbody.innerHTML = "";
+        
+        reports.forEach(r => {
+            tbody.innerHTML += `<tr>
+                <td>${r.id}</td><td>${r.location}</td><td>${r.weight} kg</td>
+                <td style="font-weight:bold; color:#1a7f37;">৳${r.reward.toFixed(2)}</td>
+            </tr>`;
+        });
+        updateWalletDisplay();
+    };
+
+    function updateWalletDisplay() {
+        const walletEl = document.getElementById('wallet-balance');
+        if(walletEl) walletEl.innerText = `৳${(currentUser.wallet || 0).toFixed(2)}`;
+    }
+</script>
+</body>
+</html>
